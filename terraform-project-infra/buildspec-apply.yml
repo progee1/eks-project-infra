@@ -1,0 +1,16 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo "Setting up kubectl for EKS..."
+      - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      - install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+      - aws eks update-kubeconfig --region $AWS_REGION --name godwin-eks-cluster
+  build:
+    commands:
+      - echo "Deploying to EKS cluster..."
+      - kubectl apply -f k8s/deployment.yml
+      - kubectl apply -f k8s/service.yml
+      - kubectl rollout status deployment/godwin-backend
+      - kubectl rollout status deployment/godwin-frontend
