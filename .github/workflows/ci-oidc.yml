@@ -13,12 +13,12 @@ on:
         default: "apply"
 
 permissions:
-  id-token: write        # Required for OIDC
+  id-token: write
   contents: read
 
 jobs:
   terraform:
-    name: Run Terraform (${{ github.event.inputs.action || 'apply' }})
+    name: Terraform Pipeline (${{ github.event.inputs.action || 'apply' }})
     runs-on: ubuntu-latest
 
     steps:
@@ -36,6 +36,41 @@ jobs:
         with:
           terraform_version: 1.7.0
 
+      ############################################
+      #     BOOTSTRAP BACKEND (S3 + DynamoDB)
+      ############################################
+      - name: Check backend and optionally bootstrap
+        env:
+          AWS_REGION: us-east-1
+          BUCKET: godwin-terraform-state-bucket198
+          DDB_TABLE: godwin-terraform-lock
+        run: |
+          set -e
+          echo "AWS caller identity:"
+          aws sts get-caller-identity
+
+          echo "Checking if S3 bucket $BUCKET exists..."
+          if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            echo "Bucket exists — skipping bootstrap"
+          else
+            echo "Bucket does not exist — running bootstrap terraform to create backend"
+            cd terraform-bootstrap
+            terraform init
+            terraform apply -auto-approve
+            cd -
+            echo "Bootstrap complete"
+            sleep 5
+          fi
+
+          if aws dynamodb describe-table --table-name "$DDB_TABLE" >/dev/null 2>&1; then
+            echo "DynamoDB table $DDB_TABLE exists"
+          else
+            echo "DynamoDB table $DDB_TABLE missing (bootstrap may have created it)"
+          fi
+
+      ############################################
+      #              TERRAFORM WORKFLOW
+      ############################################
       - name: Terraform Init
         run: terraform -chdir=terraform-project-infra init
 
@@ -44,12 +79,15 @@ jobs:
 
       - name: Terraform Plan or Destroy
         run: |
-          ACTION=${{ github.event.inputs.action }}
+          ACTION=${{ github.event.inputs.action || 'apply' }}
           DIR=terraform-project-infra
+
           if [ "$ACTION" = "destroy" ]; then
+            echo "Running DESTROY"
             terraform -chdir="$DIR" plan -destroy -out=tfplan
             terraform -chdir="$DIR" apply -auto-approve tfplan
           else
+            echo "Running APPLY"
             terraform -chdir="$DIR" plan -out=tfplan
             terraform -chdir="$DIR" apply -auto-approve tfplan
           fi
