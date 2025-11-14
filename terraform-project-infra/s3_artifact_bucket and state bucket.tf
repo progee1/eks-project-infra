@@ -1,3 +1,13 @@
+resource "aws_s3_bucket" "godwin-terraform-state" {
+  bucket = "godwin-terraform-state-bucket198"
+
+  tags = {
+    Name        = "godwin-terraform-state"
+    Environment = "Dev"
+  }
+}
+
+
 resource "aws_s3_bucket" "artifact_bucket" {
   bucket = "godwin-artifact-bucket"
   force_destroy = true
