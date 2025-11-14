@@ -37,20 +37,19 @@ jobs:
           terraform_version: 1.7.0
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform -chdir=terraform-project-infra init
 
       - name: Terraform Validate
-        run: terraform validate
+        run: terraform -chdir=terraform-project-infra validate
 
       - name: Terraform Plan or Destroy
         run: |
           ACTION=${{ github.event.inputs.action }}
+          DIR=terraform-project-infra
           if [ "$ACTION" = "destroy" ]; then
-            echo "⚠️ Destroying all Terraform-managed resources..."
-            terraform plan -destroy -out=tfplan
-            terraform apply -auto-approve tfplan
+            terraform -chdir="$DIR" plan -destroy -out=tfplan
+            terraform -chdir="$DIR" apply -auto-approve tfplan
           else
-            echo "🚀 Applying Terraform changes..."
-            terraform plan -out=tfplan
-            terraform apply -auto-approve tfplan
+            terraform -chdir="$DIR" plan -out=tfplan
+            terraform -chdir="$DIR" apply -auto-approve tfplan
           fi
