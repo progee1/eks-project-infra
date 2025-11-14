@@ -3,7 +3,7 @@ name: CI Pipeline (OIDC + EKS)
 on:
   push:
     branches:
-      - main
+      - "**"
   workflow_dispatch:
     inputs:
       action:
