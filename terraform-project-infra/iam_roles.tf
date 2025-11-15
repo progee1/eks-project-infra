@@ -146,33 +146,28 @@ resource "aws_iam_role_policy_attachment" "codepipeline_attach" {
   policy_arn = aws_iam_policy.codepipeline_policy.arn
 }
 
-# EKS cluster role
+# EKS Cluster Role
 resource "aws_iam_role" "eks_cluster_role" {
-  name = "eksClusterRole"
+  name = "eks-cluster-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
       Effect = "Allow",
-      Principal = { Service = "eks.amazonaws.com" },
+      Principal = {
+        Service = "eks.amazonaws.com"
+      },
       Action = "sts:AssumeRole"
     }]
   })
 }
 
-
-data "aws_iam_policy_document" "eks_assume_role" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type = "Service"
-      identifiers = ["eks.amazonaws.com"]
-    }
-  }
-}
-
-# Add managed policies for EKS
-resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
+resource "aws_iam_role_policy_attachment" "eks_service_policy" {
   role       = aws_iam_role.eks_cluster_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "eks_vpc_resource_controller" {
+  role       = aws_iam_role.eks_cluster_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
 }
