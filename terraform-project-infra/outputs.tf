@@ -7,7 +7,7 @@ output "artifact_bucket" {
 }
 
 output "dynamodb_table" {
-  value = aws_dynamodb_table.terraform_lock.name
+  value = aws_dynamodb_table.tf_lock.name
 }
 
 output "pipeline_name" {
