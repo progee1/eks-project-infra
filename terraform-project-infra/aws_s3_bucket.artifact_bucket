@@ -1,29 +1,18 @@
-resource "aws_s3_bucket" "godwin-terraform-state" {
-  bucket = "godwin-terraform-state-bucket198"
-
-  tags = {
-    Name        = "godwin-terraform-state"
-    Environment = "Dev"
-  }
-}
-
-
-resource "aws_s3_bucket" "artifact" {
-  bucket = "godwin-artifacts-bucket-198"
+resource "aws_s3_bucket" "artifact_bucket" {
+  bucket        = "godwin-artifact-bucket-198"
   force_destroy = true
-
-  tags = {
+}
+tags = {
     Name  = "godwin-artifact-bucket"
     Owner = "Godwin"
   }
-}
 
 resource "aws_s3_bucket_policy" "artifact_bucket_policy" {
   bucket = aws_s3_bucket.artifact_bucket.id
 
   policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
+    Version : "2012-10-17",
+    Statement : [
       {
         Sid: "CodePipelineAccess",
         Effect: "Allow",
@@ -34,13 +23,13 @@ resource "aws_s3_bucket_policy" "artifact_bucket_policy" {
             "codeapply.amazonaws.com"
           ]
         },
-        Action: [
+        Action : [
           "s3:GetObject",
           "s3:PutObject",
-          "s3:GetBucketLocation",
+          "s3:DeleteObject",
           "s3:ListBucket"
         ],
-        Resource: [
+        Resource : [
           aws_s3_bucket.artifact_bucket.arn,
           "${aws_s3_bucket.artifact_bucket.arn}/*"
         ]
