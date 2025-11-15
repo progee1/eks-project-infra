@@ -8,8 +8,8 @@ resource "aws_s3_bucket" "godwin-terraform-state" {
 }
 
 
-resource "aws_s3_bucket" "artifact_bucket" {
-  bucket = "godwin-artifact-bucket"
+resource "aws_s3_bucket" "artifact" {
+  bucket = "godwin-artifacts-bucket-198"
   force_destroy = true
 
   tags = {
