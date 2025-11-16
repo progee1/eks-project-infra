@@ -15,6 +15,7 @@ resource "aws_iam_role" "codebuild_role" {
 resource "aws_iam_policy" "codebuild_policy" {
   name = "${var.project_name}-codebuild-policy"
   description = "Policy for CodeBuild to interact with ECR, S3, EKS, DynamoDB, CloudWatch"
+
   policy = jsonencode({
     Version = "2012-10-17",
     Statement: [
@@ -39,8 +40,8 @@ resource "aws_iam_policy" "codebuild_policy" {
           "s3:ListBucket"
         ],
         Resource: [
-          aws_s3_bucket.artifact.arn,
-          "${aws_s3_bucket.artifact.arn}/*"
+          aws_s3_bucket.artifact_bucket.arn,
+          "${aws_s3_bucket.artifact_bucket.arn}/*"
         ]
       },
       {
@@ -59,7 +60,7 @@ resource "aws_iam_policy" "codebuild_policy" {
           "dynamodb:Scan",
           "dynamodb:UpdateItem"
         ],
-        Resource: aws_dynamodb_table.tf_lock.arn
+        Resource: aws_dynamodb_table.terraform_lock.arn
       },
       {
         Effect: "Allow",
@@ -104,6 +105,7 @@ resource "aws_iam_role" "codepipeline_role" {
 
 resource "aws_iam_policy" "codepipeline_policy" {
   name = "${var.project_name}-codepipeline-policy"
+
   policy = jsonencode({
     Version = "2012-10-17",
     Statement: [
@@ -115,8 +117,8 @@ resource "aws_iam_policy" "codepipeline_policy" {
           "s3:PutObject"
         ],
         Resource: [
-          aws_s3_bucket.artifact.arn,
-          "${aws_s3_bucket.artifact.arn}/*"
+          aws_s3_bucket.artifact_bucket.arn,
+          "${aws_s3_bucket.artifact_bucket.arn}/*"
         ]
       },
       {
@@ -162,9 +164,15 @@ resource "aws_iam_role" "eks_cluster_role" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "eks_service_policy" {
+# Missing attachment FIX ✔️
+resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
   role       = aws_iam_role.eks_cluster_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "eks_service_policy" {
+  role       = aws_iam_role.eks_cluster_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
 }
 
 resource "aws_iam_role_policy_attachment" "eks_vpc_resource_controller" {
