@@ -1,24 +1,25 @@
+# GitHub Actions Policy
 resource "aws_iam_policy" "github_actions_policy" {
-  name        = "github-actions-policy"
-  description = "Permissions for GitHub OIDC role used by GitHub Actions"
+  name        = "GitHubActionsPolicy"
+  description = "Allows GitHub Actions to access S3 backend and DynamoDB lock table"
 
   policy = jsonencode({
     Version = "2012-10-17",
     Statement: [
       {
-        Effect: "Allow",
+        Effect = "Allow",
         Action: [
           "s3:GetObject",
           "s3:PutObject",
           "s3:ListBucket"
         ],
-        Resource = [
-          aws_s3_bucket.artifact_bucket.arn,
-          "${aws_s3_bucket.artifact_bucket.arn}/*"
+        Resource: [
+          "arn:aws:s3:::godwin-terraform-state-bucket198",
+          "arn:aws:s3:::godwin-terraform-state-bucket198/*"
         ]
       },
       {
-        Effect: "Allow",
+        Effect = "Allow",
         Action: [
           "dynamodb:GetItem",
           "dynamodb:PutItem",
@@ -27,20 +28,14 @@ resource "aws_iam_policy" "github_actions_policy" {
           "dynamodb:Scan",
           "dynamodb:Query"
         ],
-        Resource = aws_dynamodb_table.tf_lock.arn
-      },
-      {
-        Effect: "Allow",
-        Action: [
-          "eks:DescribeCluster"
-        ],
-        Resource = "*"
+        Resource: "arn:aws:dynamodb:us-east-1:666053141215:table/godwin-terraform-lock"
       }
     ]
   })
 }
 
-resource "aws_iam_role_policy_attachment" "attach_github_actions_main" {
+# Attach policy to GitHub OIDC Role
+resource "aws_iam_role_policy_attachment" "attach_github_actions_policy" {
   role       = aws_iam_role.github_actions_role.name
   policy_arn = aws_iam_policy.github_actions_policy.arn
 }
