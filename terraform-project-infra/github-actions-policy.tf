@@ -6,20 +6,20 @@ resource "aws_iam_policy" "github_actions_policy" {
     Version = "2012-10-17",
     Statement: [
       {
-        Effect = "Allow",
-        Action = [
+        Effect: "Allow",
+        Action: [
           "s3:GetObject",
           "s3:PutObject",
           "s3:ListBucket"
         ],
         Resource = [
-          aws_s3_bucket.terraform_state.arn,
-          "${aws_s3_bucket.terraform_state.arn}/*"
+          aws_s3_bucket.artifact_bucket.arn,
+          "${aws_s3_bucket.artifact_bucket.arn}/*"
         ]
       },
       {
-        Effect = "Allow",
-        Action = [
+        Effect: "Allow",
+        Action: [
           "dynamodb:GetItem",
           "dynamodb:PutItem",
           "dynamodb:DeleteItem",
@@ -27,11 +27,11 @@ resource "aws_iam_policy" "github_actions_policy" {
           "dynamodb:Scan",
           "dynamodb:Query"
         ],
-        Resource = aws_dynamodb_table.terraform_lock.arn
+        Resource = aws_dynamodb_table.tf_lock.arn
       },
       {
-        Effect = "Allow",
-        Action = [
+        Effect: "Allow",
+        Action: [
           "eks:DescribeCluster"
         ],
         Resource = "*"
