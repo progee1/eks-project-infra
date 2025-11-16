@@ -8,7 +8,8 @@ resource "aws_eks_cluster" "godwin_cluster" {
 
   depends_on = [
     aws_iam_role_policy_attachment.eks_cluster_policy,
-    aws_iam_role_policy_attachment.eks_service_policy
+    aws_iam_role_policy_attachment.eks_service_policy,
+    aws_iam_role_policy_attachment.eks_vpc_resource_controller
   ]
 
   tags = {
