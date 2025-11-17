@@ -40,13 +40,16 @@ jobs:
       ############################################
       #      BOOTSTRAP BACKEND (S3 + DynamoDB)
       ############################################
-      - name: Check backend and optionally bootstrap and wait
+      - name: Check backend, bootstrap, and wait for table activation
         env:
           AWS_REGION: us-east-1
           BUCKET: godwin-terraform-state-bucket198
           DDB_TABLE: godwin-terraform-lock
         run: |
-          set -e
+          # NOTE: Removed 'set -e' to allow us to check the exit code of 'terraform apply' manually.
+          
+          BOOTSTRAP_RAN="false"
+
           echo "AWS caller identity:"
           aws sts get-caller-identity
 
@@ -58,30 +61,39 @@ jobs:
             echo "Bucket does not exist — running bootstrap terraform to create backend"
             cd terraform-bootstrap
             terraform init
-            terraform apply -auto-approve
+            
+            # Run apply and check for success
+            if terraform apply -auto-approve; then
+              echo "Bootstrap apply complete (Success)"
+              BOOTSTRAP_RAN="true"
+            else
+              echo "::error::Bootstrap FAILED. Check logs for AccessDeniedException on DynamoDB CreateTable."
+              exit 1 # Fail the step immediately if apply failed
+            fi
             cd -
-            echo "Bootstrap apply complete"
           fi
 
-          # 2. Check and Wait for DynamoDB Table
-          echo "Checking if DynamoDB table $DDB_TABLE exists and is ACTIVE..."
-          if ! aws dynamodb describe-table --table-name "$DDB_TABLE" >/dev/null 2>&1; then
-            echo "Table not found. Bootstrap may have failed to create it due to permissions."
-            # Since the S3 check already determined if the apply ran, we don't need to exit here.
-            # If the S3 check failed, the previous apply failed, which is the core issue.
+          # 2. Conditional Wait for DynamoDB Table
+          # If bootstrap ran successfully OR the table already exists, we must wait for it to be active.
+          if [ "$BOOTSTRAP_RAN" = "true" ] || aws dynamodb describe-table --table-name "$DDB_TABLE" >/dev/null 2>&1; then
+              
+              echo "Waiting for DynamoDB table $DDB_TABLE to be active (Max 10 minutes)..."
+              # This command will block until the table is ACTIVE.
+              if aws dynamodb wait table-exists --table-name "$DDB_TABLE" --region "$AWS_REGION"; then
+                echo "✅ DynamoDB table is now ACTIVE and ready for locking."
+              else
+                echo "::error::DynamoDB table wait timed out or failed."
+                exit 1
+              fi
+          else
+            echo "DynamoDB table not found, and bootstrap was skipped. Proceeding."
           fi
-          
-          # BLOCKING WAIT: Ensure the DynamoDB table is ACTIVE before continuing.
-          echo "Waiting for DynamoDB table $DDB_TABLE to be active (Max 10 minutes)..."
-          aws dynamodb wait table-exists --table-name "$DDB_TABLE" --region "$AWS_REGION"
-          echo "✅ DynamoDB table is now ACTIVE and ready for locking."
 
       ############################################
       #          TERRAFORM WORKFLOW
       ############################################
       - name: Terraform Init (With Reconfigure for CI/CD)
-        # We explicitly use -reconfigure and -input=false to prevent state lock errors 
-        # and ensure non-interactive operation after the bootstrap step.
+        # This step now runs only after the table is confirmed ACTIVE or was skipped because it exists.
         run: terraform -chdir=terraform-project-infra init -input=false -reconfigure
 
       - name: Terraform Validate
