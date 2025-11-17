@@ -46,40 +46,46 @@ jobs:
           BUCKET: godwin-terraform-state-bucket198
           DDB_TABLE: godwin-terraform-lock
         run: |
-          set -e # Re-enabling to ensure immediate failure on command error
+          set -e # Ensure script fails immediately on command error
 
           echo "AWS caller identity:"
           aws sts get-caller-identity
           
-          # 1. Check/Create S3 Bucket and DynamoDB Table
-          echo "Checking if S3 bucket $BUCKET exists..."
-          
-          # If the S3 bucket does not exist, run the bootstrap TF project
-          if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
-            echo "Bucket does not exist — running bootstrap terraform to create backend..."
+          # Check for existence of both S3 bucket and DynamoDB table
+          BUCKET_EXISTS=0
+          if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            BUCKET_EXISTS=1
+          fi
+
+          DDB_EXISTS=0
+          if aws dynamodb describe-table --table-name "$DDB_TABLE" >/dev/null 2>&1; then
+            DDB_EXISTS=1
+          fi
+
+          echo "Initial Status: S3 Exists: $BUCKET_EXISTS, DDB Exists: $DDB_EXISTS"
+
+          # 1. Run Bootstrap if either resource is missing
+          if [ "$BUCKET_EXISTS" -eq 1 ] && [ "$DDB_EXISTS" -eq 1 ]; then
+            echo "Backend resources exist — skipping bootstrap."
+          else
+            echo "Backend resources missing (DDB table is missing) — running bootstrap terraform to create missing resources..."
             cd terraform-bootstrap
             terraform init
-            terraform apply -auto-approve # If this fails (AccessDenied), set -e will stop the pipeline here.
+            # This 'apply' will create only the missing DDB table (since S3 exists).
+            terraform apply -auto-approve 
             cd -
             echo "Bootstrap apply complete."
-          else
-            echo "Bucket exists — skipping bootstrap."
           fi
 
           # 2. Force Wait for DynamoDB Table (Critical Step)
-          # We check if the table exists (either created or pre-existing) and then wait for it to be active.
-          
-          # NOTE: We use "aws dynamodb describe-table" only to confirm existence 
-          # before waiting. If the table doesn't exist here, the workflow will fail.
+          # We must check for table existence AFTER a potential bootstrap run.
           if aws dynamodb describe-table --table-name "$DDB_TABLE" >/dev/null 2>&1; then
               echo "Waiting for DynamoDB table $DDB_TABLE to be active (Max 10 minutes)..."
               # This command blocks until the table state is 'ACTIVE'.
               aws dynamodb wait table-exists --table-name "$DDB_TABLE" --region "$AWS_REGION"
               echo "✅ DynamoDB table is now ACTIVE and ready for locking."
           else
-              # This should only happen if the bucket exists (so bootstrap skipped) 
-              # but the DDB table is missing, which is an environment inconsistency.
-              echo "::error::DynamoDB table '$DDB_TABLE' not found. Cannot proceed."
+              echo "::error::DynamoDB table '$DDB_TABLE' not found even after bootstrap attempt. Check IAM permissions for dynamodb:CreateTable."
               exit 1
           fi
 
