@@ -1,4 +1,4 @@
-name: Terraform CI/CD 
+name: Terraform CI/CD
 
 on:
   push:
@@ -88,6 +88,29 @@ jobs:
               echo "::error::DynamoDB table '$DDB_TABLE' not found even after bootstrap attempt. Check IAM permissions for dynamodb:CreateTable."
               exit 1
           fi
+
+***
+***
+***
+***
+
+***
+***
+***
+***
+
+      ############################################
+      #          TEMPORARY LOCK RELEASE
+      ############################################
+*** - name: TEMP: Force Unlock Stale State Lock***
+*** # This step is only required to clear the lock left by the previous failed run.***
+*** # REMOVE THIS STEP AFTER ONE SUCCESSFUL RUN.***
+*** if: always()***
+*** run: |***
+*** echo "Attempting to clear stale lock..."***
+*** # The -force flag is used to prevent interactive prompts in CI***
+*** terraform -chdir=terraform-project-infra force-unlock -force f7e7abb7-bc90-7fce-d1a2-9f4448977244 || true***
+*** echo "Force unlock command finished. Proceeding."***
 
       ############################################
       #          TERRAFORM WORKFLOW
