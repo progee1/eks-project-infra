@@ -40,7 +40,7 @@ jobs:
       ############################################
       #      BOOTSTRAP BACKEND (S3 + DynamoDB)
       ############################################
-      - name: Check backend and optionally bootstrap
+      - name: Check backend and optionally bootstrap and wait
         env:
           AWS_REGION: us-east-1
           BUCKET: godwin-terraform-state-bucket198
@@ -50,6 +50,7 @@ jobs:
           echo "AWS caller identity:"
           aws sts get-caller-identity
 
+          # 1. Check/Create S3 Bucket
           echo "Checking if S3 bucket $BUCKET exists..."
           if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
             echo "Bucket exists — skipping bootstrap"
@@ -59,16 +60,21 @@ jobs:
             terraform init
             terraform apply -auto-approve
             cd -
-            echo "Bootstrap complete"
-            sleep 5
+            echo "Bootstrap apply complete"
           fi
 
-          if aws dynamodb describe-table --table-name "$DDB_TABLE" >/dev/null 2>&1; then
-            echo "DynamoDB table $DDB_TABLE exists"
-          else
-            # This condition is expected if bootstrap created it, but good to check.
-            echo "DynamoDB table $DDB_TABLE missing (bootstrap may have created it)"
+          # 2. Check and Wait for DynamoDB Table
+          echo "Checking if DynamoDB table $DDB_TABLE exists and is ACTIVE..."
+          if ! aws dynamodb describe-table --table-name "$DDB_TABLE" >/dev/null 2>&1; then
+            echo "Table not found. Bootstrap may have failed to create it due to permissions."
+            # Since the S3 check already determined if the apply ran, we don't need to exit here.
+            # If the S3 check failed, the previous apply failed, which is the core issue.
           fi
+          
+          # BLOCKING WAIT: Ensure the DynamoDB table is ACTIVE before continuing.
+          echo "Waiting for DynamoDB table $DDB_TABLE to be active (Max 10 minutes)..."
+          aws dynamodb wait table-exists --table-name "$DDB_TABLE" --region "$AWS_REGION"
+          echo "✅ DynamoDB table is now ACTIVE and ready for locking."
 
       ############################################
       #          TERRAFORM WORKFLOW
